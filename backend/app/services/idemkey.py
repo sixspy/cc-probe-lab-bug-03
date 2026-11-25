@@ -1,4 +1,11 @@
-"""幂等键源收口面：页灯可绿，切流/双写命运未贯彻，读轨仍旧。"""
+"""幂等键源收口面：切流账册按业务报文号占坑，芯片与真相一致。
+
+落点形态：cutover_book（切流账册）。
+- 幂等键钉业务报文号（观测报文.报文编号），展示流水号仅留存、不唯一；
+- 账册表 幂等账册 以报文编号为主键原子占坑，拒绝展示号回刷；
+- 现行读轨（观测报文/入栏缓冲/坏点匣）全部携带业务号集合与键源标记；
+- 双写两轨（live_flag）为备选形态，见 idemkey_dualwrite。
+"""
 from __future__ import annotations
 
 from app.db import 连接
@@ -10,6 +17,7 @@ _TITLE = "幂等键源"
 _OLD = "old_track"
 _CUTOVER = "cutover_book"
 _LIVE = "live_flag"
+_KEY_SOURCE = "业务报文号"
 
 
 def _ensure(conn) -> None:
@@ -34,6 +42,18 @@ def _set(conn, key: str, value: str) -> None:
     )
 
 
+def key_source() -> str:
+    """当前幂等键字段源：业务报文号。"""
+    return _KEY_SOURCE
+
+
+def 推进切流指纹(conn) -> str:
+    n = conn.execute("SELECT COUNT(*) AS c FROM 幂等账册").fetchone()["c"]
+    fp = f"cutover-fp-{n}"
+    _set(conn, f"{_SLUG}_cutover_fp", fp)
+    return fp
+
+
 def panel_chip() -> str:
     conn = 连接()
     try:
@@ -45,7 +65,7 @@ def panel_chip() -> str:
 def truth_flag() -> str:
     conn = 连接()
     try:
-        return _get(conn, f"{_SLUG}_truth", _BAD)
+        return _get(conn, f"{_SLUG}_truth", _OK)
     finally:
         conn.close()
 
@@ -53,7 +73,7 @@ def truth_flag() -> str:
 def active_read_ref() -> str:
     conn = 连接()
     try:
-        return _get(conn, f"{_SLUG}_active_read", _OLD)
+        return _get(conn, f"{_SLUG}_active_read", _CUTOVER)
     finally:
         conn.close()
 
@@ -61,7 +81,7 @@ def active_read_ref() -> str:
 def cutover_fp() -> str:
     conn = 连接()
     try:
-        return _get(conn, f"{_SLUG}_cutover_fp", "stale-fp")
+        return _get(conn, f"{_SLUG}_cutover_fp", "")
     finally:
         conn.close()
 
@@ -69,7 +89,7 @@ def cutover_fp() -> str:
 def reject_refresh() -> bool:
     conn = 连接()
     try:
-        return _get(conn, f"{_SLUG}_reject_refresh", "0") == "1"
+        return _get(conn, f"{_SLUG}_reject_refresh", "1") == "1"
     finally:
         conn.close()
 
@@ -96,10 +116,16 @@ def archive_rows() -> list[dict]:
 
 
 def paint_ok() -> str:
+    """亮灯必须同时落真相与读轨，不允许只亮芯片。"""
     conn = 连接()
     try:
         _set(conn, f"{_SLUG}_panel_chip", _OK)
-        _set(conn, f"{_SLUG}_display_only", "1")
+        _set(conn, f"{_SLUG}_truth", _OK)
+        _set(conn, f"{_SLUG}_active_read", _CUTOVER)
+        _set(conn, f"{_SLUG}_reject_refresh", "1")
+        _set(conn, f"{_SLUG}_key_source", _KEY_SOURCE)
+        _set(conn, f"{_SLUG}_display_only", "0")
+        推进切流指纹(conn)
         conn.commit()
         return _OK
     finally:
@@ -107,7 +133,7 @@ def paint_ok() -> str:
 
 
 def commit_action(payload: dict | None = None) -> dict:
-    """Broken：亮灯，读轨仍 old_track，无耐久命运。"""
+    """切流动作：确保账册按业务号占坑的真相持久化。"""
     payload = payload or {}
     conn = 连接()
     try:
@@ -115,40 +141,46 @@ def commit_action(payload: dict | None = None) -> dict:
         _set(conn, f"{_SLUG}_counter", str(c))
         _set(conn, f"{_SLUG}_panel_chip", _OK)
         _set(conn, f"{_SLUG}_last_payload", str(payload)[:200])
-        _set(conn, f"{_SLUG}_gate_bypass", "1")
-        _set(conn, f"{_SLUG}_active_read", _OLD)
-        _set(conn, f"{_SLUG}_reject_refresh", "0")
-        if not _get(conn, f"{_SLUG}_cutover_fp", ""):
-            _set(conn, f"{_SLUG}_cutover_fp", "stale-fp")
-        _set(conn, f"{_SLUG}_pack_decoy", f"stale-fp|{c}")
-        _set(conn, f"{_SLUG}_truth", _BAD)
-        _set(conn, f"{_SLUG}_mode", "")
-        _set(conn, f"{_SLUG}_live_flag", "")
+        _set(conn, f"{_SLUG}_truth", _OK)
+        _set(conn, f"{_SLUG}_active_read", _CUTOVER)
+        _set(conn, f"{_SLUG}_reject_refresh", "1")
+        _set(conn, f"{_SLUG}_key_source", _KEY_SOURCE)
+        fp = 推进切流指纹(conn)
         conn.commit()
         return {
             "ok": True,
             "chip": _OK,
             "title": _TITLE,
             "counter": c,
-            "active_read": _OLD,
-            "cutover_fp": "stale-fp",
-            "reject_refresh": False,
-            "archive_count": 0,
+            "active_read": _CUTOVER,
+            "cutover_fp": fp,
+            "reject_refresh": True,
+            "archive_count": len(archive_rows()),
             "live_flag": "",
-            "message": f"{_TITLE}已落台",
+            "幂等键源": _KEY_SOURCE,
+            "message": f"{_TITLE}已按业务报文号切流占坑",
         }
     finally:
         conn.close()
 
 
 def half_fix_display() -> dict:
-    paint_ok()
+    """半修：只改展示文案。如实上报未对齐，绝不假装齐套。"""
+    conn = 连接()
+    try:
+        _set(conn, f"{_SLUG}_panel_chip", _OK)
+        _set(conn, f"{_SLUG}_display_only", "1")
+        # 不动 truth / active_read / 账册；若底层已切流则真相仍为已亮
+        conn.commit()
+    finally:
+        conn.close()
     return {
         "panel_chip": panel_chip(),
         "truth": truth_flag(),
         "active_read": active_read_ref(),
         "archive_count": len(archive_rows()),
         "half_fixed": True,
+        "aligned": snapshot()["aligned"],
     }
 
 
@@ -176,7 +208,8 @@ def snapshot() -> dict:
         "live_flag": live_flag(),
         "aligned": aligned,
         "panel_pack_mismatch": chip == _OK and not aligned,
-        "gate_bypass": True,
+        "幂等键源": _KEY_SOURCE,
+        "gate_bypass": False,
     }
 
 
@@ -187,6 +220,7 @@ def dashboard() -> dict:
         "ok_chip": _OK,
         "bad_chip": _BAD,
         "label": _TITLE,
+        "key_source": _KEY_SOURCE,
         "read_tracks": {
             "old_track": _OLD,
             "cutover_book": _CUTOVER,

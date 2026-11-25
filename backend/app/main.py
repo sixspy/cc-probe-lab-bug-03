@@ -2,6 +2,7 @@ from pathlib import Path
 from quart import Quart, jsonify, request, send_from_directory, redirect
 from app import seed
 from app.services import 目录, 装载, 结栏, 贯验, 夹具, 统计, 说明
+from app.services import 对账
 from app.services import idemkey as idemkey_svc
 from app.services import idemkey_cutover as idemkey_cut_svc
 from app.services import idemkey_dualwrite as idemkey_dual_svc
@@ -222,3 +223,8 @@ async def api_idemkey_dual_post():
 @app.get("/api/idemkey/审计")
 async def api_idemkey_audit():
     return jsonify(idemkey_audit_svc.audit_summary())
+
+
+@app.get("/api/对账/报文流")
+async def api_报文流对账():
+    return jsonify(对账.报文流对账())

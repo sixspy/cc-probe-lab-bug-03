@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>幂等键源 · 探栏</title>
+  <link rel="stylesheet" href="/styles.css"/>
+  <script src="/common.js"></script>
+</head>
+<body>
+  <div class="壳">
+    <header class="顶牌">
+      <h1>探栏</h1>
+      <div class="骨">传感报文装载 → 标定/质控门槛入栏 → 站点汇总物化 → 坏点旁路 → 栏账互证<br/>皮：环境监测传感站 · 不是潮切关窗，也不是对拍双轨</div>
+    </header>
+    <div class="门槛条" id="幂等键源条"></div>
+    <header class="顶牌" style="margin-bottom:10px">
+      <h1 style="font-size:22px">幂等键源策略</h1>
+      <div class="骨">幂等键钉业务报文号；展示流水号仅留存、不唯一，拒绝展示号回刷。落点：切流账册（cutover_book）。</div>
+    </header>
+
+    <section class="卷">
+      <h2>当前策略</h2>
+      <div id="策略" class="竖排"></div>
+    </section>
+    <section class="卷">
+      <h2>报文流键源对账</h2>
+      <pre class="回执" id="对账回执">加载中…</pre>
+    </section>
+    <section class="卷">
+      <h2>形态说明</h2>
+      <div class="双栏">
+        <p class="说明">
+          切流账册（现行）：幂等账册以业务报文号为主键原子占坑，
+          同展示流水号的不同业务号各占各坑、互不互吞；
+          同业务号换展示号重放按幂等驳回，不回刷占坑。
+        </p>
+        <div class="侧注">双写两轨为备选：旧展示号轨进只读归档，现行改读 live_flag 业务号集合。</div>
+      </div>
+    </section>
+
+    <script>
+    (async () => {
+      探栏.渲染幂等键源(document.getElementById("幂等键源条"));
+      const board = await 探栏.getJSON("/api/idemkey/看板");
+      const 条 = [
+        ["幂等键源", board["幂等键源"]],
+        ["面板芯片", board["panel_chip"]],
+        ["真相", board["truth"]],
+        ["现行读轨", board["active_read"]],
+        ["切流指纹", board["cutover_fp"]],
+        ["拒展示号回刷", board["reject_refresh"] ? "是" : "否"],
+        ["是否对齐", board["aligned"] ? "对齐" : "未对齐"],
+        ["双写 live_flag", board["live_flag"] || "未启用"],
+        ["只读归档条数", board["archive_count"]],
+      ];
+      document.getElementById("策略").innerHTML = 条.map(([k, v]) =>
+        `<div class="只读框 上距8"><b class="铜字">${探栏.安全文本(k)}</b> · ${探栏.安全文本(v)}</div>`
+      ).join("");
+      const 对账 = await 探栏.getJSON("/api/对账/报文流");
+      document.getElementById("对账回执").textContent = JSON.stringify(对账, null, 2);
+    })();
+    </script>
+  </div>
+
+  <nav class="底栏"><div class="底栏内">
+    <a href="/">探栏台</a>
+    <a href="/报文流.html">报文流</a>
+    <a href="/入栏缓冲.html">入栏缓冲</a>
+    <a href="/站点汇总账.html">站点汇总账</a>
+    <a href="/坏点匣.html">坏点匣</a>
+    <a href="/栏贯验.html">栏贯验</a>
+    <a href="/站点源.html">站点源</a>
+    <a href="/栏规.html">栏规</a>
+    <a href="/幂等键源.html" class="亮">幂等键源</a>
+  </div></nav>
+</body>
+</html>

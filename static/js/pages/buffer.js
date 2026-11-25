@@ -1,5 +1,6 @@
-/* idemkeyMark false-green */
-export const idemkeyMark = true;
+/* idemkeyMark：键源钉业务报文号，展示号不再作幂等键 */
+export const idemkeyMark = false;
+export const idemkeyKeySource = '业务报文号';
 /** 探栏页面模块：buffer · 入栏缓冲
  * 真实页面在 backend/app/static；本模块提供文案与汇总辅助。
  */

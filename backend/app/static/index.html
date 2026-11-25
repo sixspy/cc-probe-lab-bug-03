@@ -14,6 +14,7 @@
       <div class="骨">传感报文装载 → 标定/质控门槛入栏 → 站点汇总物化 → 坏点旁路 → 栏账互证<br/>皮：环境监测传感站 · 不是潮切关窗，也不是对拍双轨</div>
     </header>
     <div class="门槛条" id="门槛条"></div>
+    <div class="门槛条" id="幂等键源条"></div>
     <header class="顶牌" style="margin-bottom:10px">
       <h1 style="font-size:22px">探栏台</h1>
       <div class="骨">底栏切换页面；右侧动作验主链。去皮是质控门槛入栏，不是事件时关窗。</div>
@@ -86,6 +87,7 @@
     <a href="/栏贯验.html" >栏贯验</a>
     <a href="/站点源.html" >站点源</a>
     <a href="/栏规.html" >栏规</a>
+      <a href="/幂等键源.html">幂等键源</a>
   </div></nav>
 
   <script>
@@ -93,10 +95,9 @@
     try {
       const o = await 探栏.getJSON("/api/概览");
       探栏.渲染门槛(document.getElementById("门槛条"), o.栏规 || {});
+      探栏.渲染幂等键源(document.getElementById("幂等键源条"));
     } catch (e) {}
   })();
   </script>
-<div id="data-idemkey" data-chip="幂等已亮" data-title="幂等键源" style="display:none"></div>
-<script>window.__idemkey_chip="幂等已亮";</script>
 </body>
 </html>

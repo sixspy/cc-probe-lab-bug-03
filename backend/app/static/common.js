@@ -86,8 +86,28 @@ function 填命运字典(el, dict) {
     `<div class="只读框 上距8"><b class="铜字">${安全文本(k)}</b> · ${安全文本(v)}</div>`
   ).join("");
 }
+async function 渲染幂等键源(el) {
+  if (!el) return;
+  try {
+    const [o, board] = await Promise.all([
+      getJSON("/api/概览"),
+      getJSON("/api/idemkey/看板"),
+    ]);
+    const 源 = board["幂等键源"] || o["幂等键源"] || "业务报文号";
+    const 读轨 = board["active_read"] || o["幂等读轨"] || "cutover_book";
+    const 拒回刷 = board["reject_refresh"] ? "拒展示号回刷" : "未拒回刷";
+    const 调 = board["aligned"] ? "已对齐" : "未对齐";
+    el.innerHTML =
+      `<div class="门槛卡"><div class="k">幂等键源</div><div class="v">${安全文本(源)}</div></div>` +
+      `<div class="门槛卡"><div class="k">读轨</div><div class="v">${安全文本(读轨)}</div></div>` +
+      `<div class="门槛卡"><div class="k">占坑策略</div><div class="v">${安全文本(拒回刷)}</div></div>` +
+      `<div class="门槛卡"><div class="k">键源对账</div><div class="v">${安全文本(调)}</div></div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="门槛卡"><div class="k">幂等键源</div><div class="v">读取失败</div></div>`;
+  }
+}
 window.探栏 = {
   getJSON, postJSON, 行, 徽章, 空态, 安全文本, 命运色,
-  渲染水位, 渲染门槛, 渲染批次表,
+  渲染水位, 渲染门槛, 渲染批次表, 渲染幂等键源,
   装载摘要文, 结栏摘要文, 贯验摘要文, 填命运字典,
 };

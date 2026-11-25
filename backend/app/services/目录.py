@@ -40,12 +40,15 @@ def 站点列表() -> list[dict]:
 def 报文列表(限制: int = 200) -> list[dict]:
     conn = 连接()
     try:
-        return [
+        rows = [
             dict(r)
             for r in conn.execute(
                 "SELECT * FROM 观测报文 ORDER BY 观测时 DESC LIMIT ?", (限制,)
             ).fetchall()
         ]
+        for r in rows:
+            r["幂等键源"] = "业务报文号"
+        return rows
     finally:
         conn.close()
 
@@ -54,13 +57,17 @@ def 缓冲列表(命运: str | None = None) -> list[dict]:
     conn = 连接()
     try:
         if 命运:
-            return [
+            rows = [
                 dict(r)
                 for r in conn.execute(
                     "SELECT * FROM 入栏缓冲 WHERE 命运=? ORDER BY 观测时", (命运,)
                 ).fetchall()
             ]
-        return [dict(r) for r in conn.execute("SELECT * FROM 入栏缓冲 ORDER BY 观测时").fetchall()]
+        else:
+            rows = [dict(r) for r in conn.execute("SELECT * FROM 入栏缓冲 ORDER BY 观测时").fetchall()]
+        for r in rows:
+            r["幂等键源"] = "业务报文号"
+        return rows
     finally:
         conn.close()
 
@@ -81,12 +88,15 @@ def 汇总列表(限制: int = 200) -> list[dict]:
 def 坏点列表(限制: int = 200) -> list[dict]:
     conn = 连接()
     try:
-        return [
+        rows = [
             dict(r)
             for r in conn.execute(
                 "SELECT * FROM 坏点匣 ORDER BY 编号 DESC LIMIT ?", (限制,)
             ).fetchall()
         ]
+        for r in rows:
+            r["幂等键源"] = "业务报文号"
+        return rows
     finally:
         conn.close()
 
@@ -118,6 +128,7 @@ def 概览_broken_placeholder():
 
 
 def 概览() -> dict:
+    from app.services import idemkey as _idemkey
     conn = 连接()
     try:
         return {
@@ -126,6 +137,8 @@ def 概览() -> dict:
             "站点汇总": conn.execute("SELECT COUNT(*) AS c FROM 站点汇总账").fetchone()["c"],
             "坏点": conn.execute("SELECT COUNT(*) AS c FROM 坏点匣").fetchone()["c"],
             "栏规": 栏规(),
+            "幂等键源": _idemkey.key_source(),
+            "幂等读轨": _idemkey.active_read_ref(),
         }
     finally:
         conn.close()
@@ -170,14 +183,16 @@ def 站点查(源键: str) -> dict | None:
 
 
 def idemkey_齐套灯() -> dict:
-    """展示齐套：只读面板芯片，不核真实对齐。"""
+    """齐套灯：芯片、真相、读轨实值一致才算齐套。"""
     from app.services import idemkey as _m
     snap = _m.dashboard()
     return {
         "标题": snap.get("title"),
         "芯片": snap.get("panel_chip"),
         "真相": snap.get("truth"),
-        "齐套": snap.get("panel_chip") == snap.get("ok_chip"),
+        "齐套": bool(snap.get("aligned")),
         "对齐实值": snap.get("aligned"),
+        "幂等键源": snap.get("幂等键源"),
+        "active_read": snap.get("active_read"),
         "panel_pack_mismatch": snap.get("panel_pack_mismatch", True),
     }

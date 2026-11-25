@@ -1,5 +1,6 @@
-/* idemkey panel chip 幂等已亮 */
-export const idemkeyChip = '幂等已亮';
+/* idemkey panel chip：读后端 /api/idemkey/看板，不硬编码 */
+export const idemkeyChip = '';
+export const idemkeyKeySource = '业务报文号';
 /** 探栏页面模块：home · 探栏台
  * 真实页面在 backend/app/static；本模块提供文案与汇总辅助。
  */
